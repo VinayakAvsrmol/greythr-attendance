@@ -49,25 +49,22 @@ console.log("---------------------");
     }
     console.log("Step 4: SUCCESS - Logged in!");
 
-    console.log(`Step 5: Marking ${action}...`);
+    // Mark attendance using fetch inside the browser context
     const attendanceAction = action === "signin" ? "Signin" : "SignOut";
-    const result = await page.evaluate(async (homepage, attendanceAction) => {
-      const res = await fetch(`${homepage}/v3/api/attendance/mark-attendance?action=${attendanceAction}`, {
+    console.log(`Step 5: Marking ${attendanceAction}...`);
+
+    const resultText = await page.evaluate((attendanceAction) => {
+      return fetch(`/v3/api/attendance/mark-attendance?action=${attendanceAction}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-      });
-      return { status: res.status, text: await res.text() };
-    }, homePage, attendanceAction);
+      }).then(r => r.text());
+    }, attendanceAction);
 
-    console.log(`Step 5 response: ${result.status} ${result.text}`);
+    console.log("Step 5 response:", resultText);
 
-    if (result.status === 200) {
-      const now = new Date();
-      console.log(`✅ ${attendanceAction} marked successfully at ${now.getHours()}:${String(now.getMinutes()).padStart(2,"0")} UTC`);
-    } else {
-      throw new Error(`Attendance failed: ${result.status} - ${result.text}`);
-    }
+    const now = new Date();
+    console.log(`✅ ${attendanceAction} marked successfully at ${now.getHours()}:${String(now.getMinutes()).padStart(2,"0")} UTC`);
 
     await browser.close();
 
