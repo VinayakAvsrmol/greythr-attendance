@@ -6,6 +6,7 @@ if (homePage) homePage = homePage.split("/uas/")[0];
 const employeeId = process.env.EMPLOYEE_ID;
 const password = process.env.PASSWORD;
 const action = process.env.ACTION || "signin";
+const attendanceAction = action === "signin" ? "Signin" : "SignOut";
 
 console.log("--- Configuration ---");
 console.log("Homepage:", homePage);
@@ -29,7 +30,7 @@ console.log("---------------------");
     });
     console.log("Step 2: SUCCESS");
 
-    console.log("Step 3: Entering Employee ID...");
+    console.log("Step 3: Entering credentials...");
     await page.waitForSelector('input[name="username"]', { timeout: 15000 });
     await page.fill('input[name="username"]', employeeId);
     await page.fill('input[name="password"]', password);
@@ -49,22 +50,47 @@ console.log("---------------------");
     }
     console.log("Step 4: SUCCESS - Logged in!");
 
-    // Mark attendance using fetch inside the browser context
-    const attendanceAction = action === "signin" ? "Signin" : "SignOut";
+    // Use axios to call the API directly with cookies from the browser
     console.log(`Step 5: Marking ${attendanceAction}...`);
 
-    const resultText = await page.evaluate((attendanceAction) => {
-      return fetch(`/v3/api/attendance/mark-attendance?action=${attendanceAction}`, {
+    // Get cookies from browser
+    const cookies = await context.cookies();
+    const accessToken = cookies.find(c => c.name === "access_token");
+    if (!accessToken) {
+      console.log("Cookies found:", cookies.map(c => c.name).join(", "));
+      throw new Error("Could not find access_token in cookies");
+    }
+    console.log("Got access token!");
+
+    // Use node's https to call the API
+    const https = require("https");
+    const result = await new Promise((resolve, reject) => {
+      const options = {
+        hostname: homePage.replace("https://", ""),
+        path: `/v3/api/attendance/mark-attendance?action=${attendanceAction}`,
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-      }).then(r => r.text());
-    }, attendanceAction);
+        headers: {
+          "Content-Type": "application/json",
+          "Cookie": `access_token=${accessToken.value}`,
+        },
+      };
+      const req = https.request(options, (res) => {
+        let data = "";
+        res.on("data", chunk => data += chunk);
+        res.on("end", () => resolve({ status: res.statusCode, text: data }));
+      });
+      req.on("error", reject);
+      req.end();
+    });
 
-    console.log("Step 5 response:", resultText);
+    console.log("Step 5 response:", result.status, result.text);
 
-    const now = new Date();
-    console.log(`✅ ${attendanceAction} marked successfully at ${now.getHours()}:${String(now.getMinutes()).padStart(2,"0")} UTC`);
+    if (result.status === 200) {
+      const now = new Date();
+      console.log(`✅ ${attendanceAction} marked successfully at ${now.getHours()}:${String(now.getMinutes()).padStart(2,"0")} UTC`);
+    } else {
+      throw new Error(`Attendance failed: ${result.status} - ${result.text}`);
+    }
 
     await browser.close();
 
