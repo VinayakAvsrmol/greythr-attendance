@@ -1,0 +1,9 @@
+{
+  "name": "greythr-attendance",
+  "version": "1.0.0",
+  "description": "Auto attendance for GreytHR",
+  "main": "main.js",
+  "dependencies": {
+    "playwright": "^1.40.0"
+  }
+}

@@ -1,0 +1,59 @@
+name: GreytHR Auto Attendance
+
+on:
+  schedule:
+    # 9:20 AM IST = 3:50 AM UTC (Monday to Friday)
+    - cron: '50 3 * * 1-5'
+    # 7:10 PM IST = 1:40 PM UTC (Monday to Friday)
+    - cron: '40 13 * * 1-5'
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action to perform'
+        required: true
+        default: 'signin'
+        type: choice
+        options:
+          - signin
+          - signout
+
+jobs:
+  mark-attendance:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Install Playwright Chromium only
+        run: npx playwright install chromium --with-deps
+
+      - name: Determine action (signin or signout)
+        id: action
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "ACTION=${{ github.event.inputs.action }}" >> $GITHUB_OUTPUT
+          else
+            HOUR=$(date -u +%H)
+            if [ "$HOUR" = "03" ]; then
+              echo "ACTION=signin" >> $GITHUB_OUTPUT
+            else
+              echo "ACTION=signout" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+      - name: Run attendance script
+        env:
+          GREYTHR_HOMEPAGE_URI: ${{ secrets.GREYTHR_HOMEPAGE_URI }}
+          EMPLOYEE_ID: ${{ secrets.EMPLOYEE_ID }}
+          PASSWORD: ${{ secrets.PASSWORD }}
+          ACTION: ${{ steps.action.outputs.ACTION }}
+        run: node main.js
