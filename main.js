@@ -31,9 +31,16 @@ console.log("---------------------");
     console.log("Step 2: SUCCESS");
 
     console.log("Step 3: Entering credentials...");
-    await page.waitForSelector('input[name="username"]', { timeout: 15000 });
-    await page.fill('input[name="username"]', employeeId);
-    await page.fill('input[name="password"]', password);
+    await page.waitForSelector('input[name="username"], input[id="username"], input[type="email"], input[placeholder*="User"]', { timeout: 15000 });
+
+const usernameField = await page.$('input[name="username"]') || 
+                      await page.$('input[id="username"]') || 
+                      await page.$('input[type="email"]') ||
+                      await page.$('input[placeholder*="User"]');
+
+if (!usernameField) throw new Error("Could not find username field!");
+await usernameField.fill(employeeId);
+await page.fill('input[name="password"], input[type="password"]', password);
     console.log("Step 3: SUCCESS");
 
     console.log("Step 4: Clicking Login...");
